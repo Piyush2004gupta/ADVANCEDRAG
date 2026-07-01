@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced RAG Copilot</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --font-primary: 'Plus Jakarta Sans', sans-serif;
+      --font-display: 'Outfit', sans-serif;
+      --bg-color: #080b11;
+      --card-bg: rgba(17, 24, 39, 0.45);
+      --card-border: rgba(255, 255, 255, 0.06);
+      --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      --text-main: #f8fafc;
+      --text-mute: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-primary);
+      background-color: var(--bg-color);
+      background: radial-gradient(circle at 50% 0%, #151b2d 0%, #080b11 70%);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Layout Wrapper */
+    .app-container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Main Chat Section */
+    .chat-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-width: 0;
+      background: rgba(9, 13, 22, 0.2);
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px;
+      background: rgba(17, 24, 39, 0.4);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--card-border);
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      padding: 6px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-icon svg {
+      width: 20px;
+      height: 20px;
+      color: #3b82f6;
+    }
+
+    .brand-details h1 {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .brand-details p {
+      font-size: 11px;
+      color: var(--text-mute);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-mute);
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      padding: 4px 10px;
+      border-radius: 9999px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: #10b981;
+      animation: pulse-dot 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.5; }
+    }
+
+    .btn-inspector {
+      display: none; /* Shown dynamically when a response is loaded */
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-inspector:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-inspector.active {
+      background: #3b82f6;
+      border-color: #3b82f6;
+    }
+
+    /* Chat Area */
+    .chat-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px;
+    }
+
+    .chat-feed-inner {
+      max-width: 768px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Welcome Container */
+    .welcome-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 24px;
+      padding: 64px 0;
+    }
+
+    .welcome-logo {
+      padding: 16px;
+      background: var(--accent-gradient);
+      border-radius: 50%;
+      box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .welcome-logo svg {
+      width: 32px;
+      height: 32px;
+      color: #fff;
+    }
+
+    .welcome-text h2 {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .welcome-text p {
+      font-size: 14px;
+      color: var(--text-mute);
+      max-width: 480px;
+      line-height: 1.6;
+    }
+
+    /* Suggested queries grid */
+    .suggested-grid {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .suggested-title {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-mute);
+    }
+
+    .btn-suggested {
+      text-align: left;
+      font-size: 12px;
+      padding: 14px;
+      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-suggested:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(59, 130, 246, 0.3);
+      transform: translateY(-2px);
+      color: #fff;
+    }
+
+    .btn-suggested svg {
+      width: 14px;
+      height: 14px;
+      color: #3b82f6;
+      opacity: 0;
+      transform: translateX(-4px);
+      transition: all 0.2s;
+    }
+
+    .btn-suggested:hover svg {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    /* Message Bubbles */
+    .message-row {
+      display: flex;
+      gap: 16px;
+      width: 100%;
+      animation: message-fade 0.3s ease-out forwards;
+    }
+
+    @keyframes message-fade {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message-row.user {
+      justify-content: flex-end;
+    }
+
+    .message-avatar {
+      padding: 8px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.15);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: fit-content;
+    }
+
+    .message-avatar svg {
+      width: 16px;
+      height: 16px;
+      color: #60a5fa;
+    }
+
+    .message-row.user .message-avatar {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .message-row.user .message-avatar svg {
+      color: #cbd5e1;
+    }
+
+    .message-content-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-width: 80%;
+    }
+
+    .message-sender {
+      font-size: 11px;
+      color: var(--text-mute);
+      padding: 0 4px;
+    }
+
+    .message-bubble {
+      padding: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .message-row.user .message-bubble {
+      background: #2563eb;
+      border-color: #3b82f6;
+      color: #fff;
+      border-top-right-radius: 0;
+    }
+
+    .message-row.assistant .message-bubble {
+      border-top-left-radius: 0;
+    }
+
+    .message-row.error .message-bubble {
+      background: rgba(239, 68, 68, 0.05);
+      border-color: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border-top-left-radius: 0;
+    }
+
+    .message-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      padding: 0 4px;
+    }
+
+    .verification-badge {
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .verification-badge.supported {
+      color: #10b981;
+    }
+
+    .verification-badge.not-supported {
+      color: #ef4444;
+    }
+
+    .btn-action-inspect {
+      color: #3b82f6;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .btn-action-inspect:hover {
+      text-decoration: underline;
+    }
+
+    /* Typing Loading Animation */
+    .typing-loader {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-mute);
+      animation: pulse-slow 1.5s infinite ease-in-out;
+    }
+
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Input container at the bottom */
+    .input-section {
+      padding: 24px;
+      background: rgba(9, 13, 22, 0.1);
+      border-top: 1px solid var(--card-border);
+      z-index: 10;
+    }
+
+    .input-wrapper {
+      max-width: 768px;
+      margin: 0 auto;
+    }
+
+    form {
+      display: flex;
+      align-items: center;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 10px 16px;
+      gap: 12px;
+      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+      transition: border-color 0.2s;
+    }
+
+    form:focus-within {
+      border-color: rgba(59, 130, 246, 0.5);
+      box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.15);
+    }
+
+    form input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: none;
+      color: #e2e8f0;
+      font-size: 14px;
+      font-family: var(--font-primary);
+      padding: 8px 4px;
+    }
+
+    form input::placeholder {
+      color: #475569;
+    }
+
+    form button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s;
+    }
+
+    form button:hover {
+      background: #3b82f6;
+    }
+
+    form button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      background: #2563eb;
+    }
+
+    /* RAG Pipeline Drawer (Inspector Panel) */
+    .inspector-drawer {
+      display: none; /* Shown dynamically */
+      width: 450px;
+      border-l: 1px solid var(--card-border);
+      background: #090d16;
+      height: 100%;
+      flex-direction: column;
+      z-index: 20;
+      animation: slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      shrink-0: 0;
+    }
+
+    @keyframes slide-in {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .drawer-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .drawer-title svg {
+      width: 16px;
+      height: 16px;
+      color: #3b82f6;
+    }
+
+    .drawer-title h2 {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #fff;
+    }
+
+    .btn-close-drawer {
+      background: none;
+      border: none;
+      color: var(--text-mute);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .btn-close-drawer:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+    }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-mute);
+      margin-bottom: 8px;
+    }
+
+    /* Verification card styles */
+    .factcheck-card {
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      gap: 12px;
+    }
+
+    .factcheck-card.supported {
+      background: rgba(16, 185, 129, 0.03);
+      border-color: rgba(16, 185, 129, 0.15);
+      color: #a7f3d0;
+    }
+
+    .factcheck-card.not-supported {
+      background: rgba(239, 68, 68, 0.03);
+      border-color: rgba(239, 68, 68, 0.15);
+      color: #fecaca;
+    }
+
+    .factcheck-icon svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .factcheck-card.supported .factcheck-icon svg { color: #10b981; }
+    .factcheck-card.not-supported .factcheck-icon svg { color: #ef4444; }
+
+    .factcheck-text h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .factcheck-text p {
+      font-size: 11px;
+      color: var(--text-mute);
+      line-height: 1.5;
+    }
+
+    /* Textarea representing compressed context */
+    .compressed-textarea {
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #cbd5e1;
+      max-height: 150px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Retrieved Chunks Card list */
+    .chunk-card {
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chunk-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .chunk-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .chunk-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chunk-title svg {
+      width: 14px;
+      height: 14px;
+      color: #3b82f6;
+    }
+
+    .chunk-pages {
+      font-size: 10px;
+      color: var(--text-mute);
+    }
+
+    .chunk-score {
+      font-size: 9px;
+      font-family: monospace;
+      font-weight: 700;
+      padding: 2px 6px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border-radius: 4px;
+    }
+
+    .chunk-summary {
+      font-size: 11px;
+      color: #94a3b8;
+      font-style: italic;
+      background: rgba(255, 255, 255, 0.02);
+      padding: 8px;
+      border-radius: 6px;
+      border-left: 2px solid #475569;
+    }
+
+    .chunk-content {
+      font-size: 11px;
+      color: #94a3b8;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.02);
+      max-height: 110px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Main Chat section -->
+    <div class="chat-section">
+      
+      <!-- Header -->
+      <header>
+        <div class="brand">
+          <div class="brand-icon">
+            <i data-lucide="bot"></i>
+          </div>
+          <div class="brand-details">
+            <h1>Knowledge Base Copilot</h1>
+            <p>Enterprise AI RAG System</p>
+          </div>
+        </div>
+        
+        <div class="header-actions">
+          <div class="status-badge">
+            <span class="status-dot"></span>
+            <span>Connected</span>
+          </div>
+          <button id="btn-toggle-inspector" class="btn-inspector">
+            <i data-lucide="info" style="width: 14px; height: 14px;"></i>
+            <span>RAG Inspector</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Chat Feed container -->
+      <div id="chat-feed" class="chat-feed">
+        <div id="chat-feed-inner" class="chat-feed-inner">
+          
+          <!-- Welcome Initial View -->
+          <div id="welcome-view" class="welcome-view">
+            <div class="welcome-container">
+              <div class="welcome-logo">
+                <i data-lucide="sparkles"></i>
+              </div>
+              <div class="welcome-text">
+                <h2>How can I help you today?</h2>
+                <p>Ask questions about ingestion, chunking, memory, reranking, or metadata from the Enterprise AI Knowledge Base PDF.</p>
+              </div>
+              
+              <div class="suggested-grid">
+                <p class="suggested-title">Suggested Topics</p>
+                
+                <button class="btn-suggested" data-query="What industries does the organization build enterprise AI solutions for?">
+                  <span>What industries does the organization build enterprise AI solutions for?</span>
+                  <i data-lucide="arrow-right"></i>
+                </button>
+                
+                <button class="btn-suggested" data-query="Explain semantic search and hybrid search in production systems">
+                  <span>Explain semantic search and hybrid search in production systems</span>
+                  <i data-lucide="arrow-right"></i>
+                </button>
+                
+                <button class="btn-suggested" data-query="Ingestion and chunking best practices in production RAG systems">
+                  <span>Ingestion and chunking best practices in production RAG systems</span>
+                  <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Chat input bar -->
+      <div class="input-section">
+        <div class="input-wrapper">
+          <form id="chat-form">
+            <input 
+              id="query-input" 
+              type="text" 
+              placeholder="Ask about AI Customer support, architecture, metadata..." 
+              required
+              autocomplete="off"
+            />
+            <button id="btn-send" type="submit">
+              <i data-lucide="send" style="width: 16px; height: 16px;"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right-side Drawer (Inspector Panel) -->
+    <div id="inspector-drawer" class="inspector-drawer">
+      
+      <div class="drawer-header">
+        <div class="drawer-title">
+          <i data-lucide="layers"></i>
+          <h2>RAG Pipeline Inspector</h2>
+        </div>
+        <button id="btn-close-drawer" class="btn-close-drawer">
+          <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+
+      <div class="drawer-body">
+        
+        <!-- Hallucination Shield -->
+        <div>
+          <p class="section-label">Anti-Hallucination Guardrail Check</p>
+          <div id="factcheck-card" class="factcheck-card supported">
+            <div class="factcheck-icon">
+              <i id="factcheck-icon-svg" data-lucide="shield-check"></i>
+            </div>
+            <div class="factcheck-text">
+              <h3 id="factcheck-status-text">Verification Status</h3>
+              <p id="factcheck-explanation">Verification explanation goes here.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compressed Context -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <p class="section-label" style="margin-bottom: 0;">Compressed Context</p>
+            <span id="char-count-badge" style="font-size: 9px; color: var(--text-mute);">0 chars</span>
+          </div>
+          <div id="compressed-context-box" class="compressed-textarea">No context loaded.</div>
+        </div>
+
+        <!-- Retrieved Documents Chunks -->
+        <div>
+          <p class="section-label">Retrieved Chunks</p>
+          <div id="chunks-list" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Chunks will be injected here -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    const API_URL = 'http://127.0.0.1:8000/api/query';
+    
+    // State variables
+    let currentRAGData = null;
+    let isDrawerOpen = false;
+    const messagesData = [];
+
+    // DOM Elements
+    const chatForm = document.getElementById('chat-form');
+    const queryInput = document.getElementById('query-input');
+    const chatFeedInner = document.getElementById('chat-feed-inner');
+    const welcomeView = document.getElementById('welcome-view');
+    const chatFeed = document.getElementById('chat-feed');
+    const btnSend = document.getElementById('btn-send');
+    
+    const inspectorDrawer = document.getElementById('inspector-drawer');
+    const btnToggleInspector = document.getElementById('btn-toggle-inspector');
+    const btnCloseDrawer = document.getElementById('btn-close-drawer');
+    
+    const factcheckCard = document.getElementById('factcheck-card');
+    const factcheckIcon = document.getElementById('factcheck-icon-svg');
+    const factcheckStatusText = document.getElementById('factcheck-status-text');
+    const factcheckExplanation = document.getElementById('factcheck-explanation');
+    
+    const compressedContextBox = document.getElementById('compressed-context-box');
+    const charCountBadge = document.getElementById('char-count-badge');
+    const chunksList = document.getElementById('chunks-list');
+
+    // Auto focus input on page load
+    queryInput.focus();
+
+    // Toggle drawer visibility
+    function toggleDrawer(forceState) {
+      isDrawerOpen = forceState !== undefined ? forceState : !isDrawerOpen;
+      if (isDrawerOpen && currentRAGData) {
+        inspectorDrawer.style.display = 'flex';
+        btnToggleInspector.classList.add('active');
+        renderRAGDetails();
+      } else {
+        inspectorDrawer.style.display = 'none';
+        btnToggleInspector.classList.remove('active');
+      }
+    }
+
+    // Render detailed RAG metadata in the side drawer
+    function renderRAGDetails() {
+      if (!currentRAGData) return;
+
+      // Update Verification Card
+      const isSupported = currentRAGData.verification === 'SUPPORTED';
+      if (isSupported) {
+        factcheckCard.className = 'factcheck-card supported';
+        factcheckStatusText.innerText = 'Verification Passed';
+        factcheckExplanation.innerText = 'The fact-checker LLM successfully matched every statement in the generated answer with the retrieved context.';
+        factcheckIcon.setAttribute('data-lucide', 'shield-check');
+      } else {
+        factcheckCard.className = 'factcheck-card not-supported';
+        factcheckStatusText.innerText = 'Verification Fails';
+        factcheckExplanation.innerText = 'The response contains details that were not fully supported by the retrieved document chunks.';
+        factcheckIcon.setAttribute('data-lucide', 'shield-alert');
+      }
+
+      // Update Context
+      compressedContextBox.innerText = currentRAGData.compressedContext || "No context was passed to the LLM.";
+      charCountBadge.innerText = `${currentRAGData.compressedContext?.length || 0} chars`;
+
+      // Update Chunks List
+      chunksList.innerHTML = '';
+      if (currentRAGData.retrievedDocuments && currentRAGData.retrievedDocuments.length > 0) {
+        currentRAGData.retrievedDocuments.forEach(doc => {
+          const card = document.createElement('div');
+          card.className = 'chunk-card';
+          card.innerHTML = `
+            <div class="chunk-header">
+              <div class="chunk-title-group">
+                <span class="chunk-title">
+                  <i data-lucide="file-text" style="width: 14px; height: 14px; color: #3b82f6; shrink-0: 0;"></i>
+                  ${escapeHTML(doc.title)}
+                </span>
+                <span class="chunk-pages">Source Pages: ${escapeHTML(doc.pages)}</span>
+              </div>
+              <span class="chunk-score">BGE Score: ${doc.score.toFixed(3)}</span>
+            </div>
+            ${doc.summary ? `
+              <div class="chunk-summary">
+                <strong>Summary: </strong>${escapeHTML(doc.summary)}
+              </div>
+            ` : ''}
+            <div class="chunk-content">
+              ${escapeHTML(doc.content)}
+            </div>
+          `;
+          chunksList.appendChild(card);
+        });
+      } else {
+        chunksList.innerHTML = '<p style="font-size: 11px; color: var(--text-mute);">No chunks retrieved.</p>';
+      }
+
+      // Re-trigger lucide icons update for dynamically injected content
+      lucide.createIcons();
+    }
+
+    // Helper to escape HTML characters
+    function escapeHTML(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+    }
+
+    // Handle incoming chat query submission
+    async function submitQuery(text) {
+      if (!text.trim()) return;
+
+      // Hide welcome container on first submit
+      if (welcomeView) {
+        welcomeView.style.display = 'none';
+      }
+
+      // Append User message
+      appendMessage('user', text);
+
+      // Show loader
+      const loaderId = appendLoader();
+      
+      // Disable inputs
+      queryInput.disabled = true;
+      btnSend.disabled = true;
+      queryInput.value = '';
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: text })
+        });
+
+        if (!response.ok) {
+          throw new Error('API server error');
+        }
+
+        const data = await response.json();
+        removeLoader(loaderId);
+
+        const ragMsg = {
+          verification: data.verification,
+          compressedContext: data.compressed_context,
+          retrievedDocuments: data.retrieved_documents
+        };
+        messagesData.push(ragMsg);
+
+        // Append Assistant response
+        appendMessage('assistant', data.answer, ragMsg);
+        
+        // Auto-select latest RAG logs
+        currentRAGData = ragMsg;
+        btnToggleInspector.style.display = 'flex';
+        
+      } catch (err) {
+        console.error(err);
+        removeLoader(loaderId);
+        appendMessage('assistant', "Error: Could not retrieve response. Please check that the backend server is running at http://127.0.0.1:8000.", null, true);
+      } finally {
+        queryInput.disabled = false;
+        btnSend.disabled = false;
+        queryInput.focus();
+      }
+    }
+
+    // Append standard message bubble
+    function appendMessage(role, text, ragData = null, isError = false) {
+      const row = document.createElement('div');
+      row.className = `message-row ${role} ${isError ? 'error' : ''}`;
+      
+      let badgeHTML = '';
+      let actionsHTML = '';
+      
+      if (role === 'assistant' && !isError && ragData) {
+        const isSupported = ragData.verification === 'SUPPORTED';
+        badgeHTML = `
+          <span class="verification-badge ${isSupported ? 'supported' : 'not-supported'}">
+            <i data-lucide="${isSupported ? 'shield-check' : 'shield-alert'}" style="width: 14px; height: 14px;"></i>
+            ${ragData.verification}
+          </span>
+        `;
+
+        actionsHTML = `
+          <div class="message-actions">
+            ${badgeHTML}
+            <span>•</span>
+            <button class="btn-action-inspect" onclick="inspectMessageLogsByIndex(${messagesData.length - 1})">
+              Inspect Source Logs
+            </button>
+          </div>
+        `;
+      }
+
+      row.innerHTML = `
+        ${role === 'assistant' ? `
+          <div class="message-avatar">
+            <i data-lucide="bot"></i>
+          </div>
+        ` : ''}
+        
+        <div class="message-content-wrapper">
+          <div class="message-sender">${role === 'user' ? 'You' : 'Advanced RAG Engine'}</div>
+          <div class="message-bubble">${text}</div>
+          ${actionsHTML}
+        </div>
+
+        ${role === 'user' ? `
+          <div class="message-avatar">
+            <i data-lucide="user"></i>
+          </div>
+        ` : ''}
+      `;
+
+      chatFeedInner.appendChild(row);
+      lucide.createIcons();
+      scrollToBottom();
+    }
+
+    // Open drawer with specific logs when clicking message inspect links
+    window.inspectMessageLogsByIndex = function(index) {
+      const data = messagesData[index];
+      currentRAGData = data;
+      toggleDrawer(true);
+    };
+
+    // Append RAG loading message
+    function appendLoader() {
+      const loaderId = `loader-${Date.now()}`;
+      const row = document.createElement('div');
+      row.id = loaderId;
+      row.className = 'message-row assistant';
+      row.innerHTML = `
+        <div class="message-avatar">
+          <i data-lucide="bot"></i>
+        </div>
+        <div class="message-content-wrapper">
+          <div class="message-sender">Advanced RAG Engine</div>
+          <div class="message-bubble typing-loader">
+            <i data-lucide="sparkles" class="pulse-animation" style="width: 16px; height: 16px; color: #60a5fa;"></i>
+            <span>RAG Pipeline running (Reranking, Compression, Fact Checking)...</span>
+          </div>
+        </div>
+      `;
+      chatFeedInner.appendChild(row);
+      lucide.createIcons();
+      scrollToBottom();
+      return loaderId;
+    }
+
+    // Remove loading message
+    function removeLoader(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    }
+
+    // Scroll chat feed to bottom
+    function scrollToBottom() {
+      chatFeed.scrollTop = chatFeed.scrollHeight;
+    }
+
+    // Form submission listener
+    chatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitQuery(queryInput.value);
+    });
+
+    // Suggested query card click listener
+    document.querySelectorAll('.btn-suggested').forEach(btn => {
+      btn.addEventListener('click', () => {
+        submitQuery(btn.getAttribute('data-query'));
+      });
+    });
+
+    // Toggle drawer click listeners
+    btnToggleInspector.addEventListener('click', () => toggleDrawer());
+    btnCloseDrawer.addEventListener('click', () => toggleDrawer(false));
+  </script>
+</body>
+</html>
